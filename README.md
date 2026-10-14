@@ -1,9 +1,14 @@
 # DeviceCode
 
-Liest den Code, den das Kodi-YouTube-Add-on auf dem Fernseher anzeigt (z. B. `ABC-DEF-GHI`),
-mit der Handykamera ab, kopiert ihn in die Zwischenablage und öffnet
-<https://www.google.com/device> in einem Chrome Custom Tab. Dort ist man schon mit dem Google-Konto
-aus Chrome angemeldet und muss den Code nur noch einfügen.
+Viele Geräte ohne richtige Tastatur melden sich über Google an, indem sie einen Code anzeigen
+(z. B. `ABC-DEF-GHI`), den man unter <https://www.google.com/device> eingibt. Das machen etwa
+YouTube auf Smart-TVs und Konsolen, Kodi-Add-ons wie das YouTube-Add-on und andere Apps mit
+Google-Anmeldung.
+
+DeviceCode liest diesen Code mit der Handykamera ab, kopiert ihn in die Zwischenablage und öffnet
+die Google-Seite in einem Chrome Custom Tab. Dort ist man schon mit dem Google-Konto aus Chrome
+angemeldet und muss den Code nur noch bestätigen. Codes anderer Anbieter mit eigener
+Anmeldeseite (z. B. Netflix oder Amazon) unterstützt die App nicht.
 
 ## Ablauf
 
