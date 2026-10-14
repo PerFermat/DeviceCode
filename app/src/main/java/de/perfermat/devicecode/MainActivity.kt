@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -56,6 +57,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -114,15 +116,25 @@ private fun DeviceCodeApp() {
         onPauseOrDispose { }
     }
 
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    // Hält den Zustand der Kameraseite (letzte Codes) fest, solange die Einstellungen offen sind.
+    val stateHolder = rememberSaveableStateHolder()
+
     if (hasPermission) {
-        ScannerScreen()
+        if (showSettings) {
+            SettingsScreen(onBack = { showSettings = false })
+        } else {
+            stateHolder.SaveableStateProvider("scanner") {
+                ScannerScreen(onOpenSettings = { showSettings = true })
+            }
+        }
     } else {
         PermissionScreen(onRequest = { permissionLauncher.launch(Manifest.permission.CAMERA) })
     }
 }
 
 @Composable
-private fun ScannerScreen() {
+private fun ScannerScreen(onOpenSettings: () -> Unit) {
     val context = LocalContext.current
     var lastCode by rememberSaveable { mutableStateOf<String?>(null) }
     // Die zuletzt verarbeiteten Codes – der Fernseher zeigt einen Code oft noch an, wenn man zurückkommt.
@@ -177,6 +189,14 @@ private fun ScannerScreen() {
                     )
                 }
             }
+        } else {
+            FilledTonalButton(
+                onClick = onOpenSettings,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .safeDrawingPadding()
+                    .padding(16.dp),
+            ) { Text("Einstellungen") }
         }
 
         Card(
@@ -350,7 +370,8 @@ private fun copyAndOpen(context: Context, code: String, launch: (Intent) -> Unit
     // Chrome bevorzugen, damit die dort bestehende Google-Anmeldung greift; sonst Standardbrowser.
     CustomTabsClient.getPackageName(context, listOf(CHROME), true)
         ?.let { customTab.intent.setPackage(it) }
-    customTab.intent.data = Uri.parse(DEVICE_URL)
+    val url = if (AppSettings.prefillCode(context)) "$DEVICE_URL?user_code=${Uri.encode(code)}" else DEVICE_URL
+    customTab.intent.data = Uri.parse(url)
     try {
         // Chrome zeigt das Halbfenster nur, wenn der Tab per startActivityForResult kommt.
         launch(customTab.intent)

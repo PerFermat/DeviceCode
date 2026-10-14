@@ -15,7 +15,10 @@ aus Chrome angemeldet und muss den Code nur noch einfügen.
    und bestätigen, dann oben auf die Kamera tippen (oder das Fenster nach unten wischen). Die Kamera
    läuft auch hinter dem Fenster weiter: Erscheint schon der nächste Code, wird das Fenster durch ein
    neues ersetzt. Codes, die schon verarbeitet wurden (die letzten 10), lösen nicht noch einmal aus.
-4. **Erneut öffnen** kopiert den letzten Code noch einmal und öffnet die Seite, falls der Tab
+4. Ist in den **Einstellungen** (Knopf oben rechts) „Code automatisch eintragen“ an (Standard),
+   wird die Seite als `https://www.google.com/device?user_code=…` geöffnet und das Eingabefeld ist
+   schon ausgefüllt. Ausgeschaltet bleibt nur die Zwischenablage.
+5. **Erneut öffnen** kopiert den letzten Code noch einmal und öffnet die Seite, falls der Tab
    versehentlich geschlossen wurde.
 
 Die Texterkennung (ML Kit, lateinisches Skript) läuft komplett auf dem Gerät. Die App fordert nur
@@ -54,6 +57,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 | --- | --- |
 | `app/src/main/java/.../DeviceCodeParser.kt` | Regex samt OCR-Korrekturen (0→O, 1→I, 5→S …) und die Prüfung „3 Frames gleich“ |
 | `app/src/main/java/.../MainActivity.kt` | Compose-UI, Berechtigung, CameraX + ML Kit, Zwischenablage, Vibration, Custom Tab |
+| `app/src/main/java/.../AppSettings.kt` | Einstellungen (SharedPreferences) und Einstellungsseite |
 | `gradle/libs.versions.toml` | Alle Abhängigkeits-Versionen |
 
 Hinweis: Das Debug-APK ist rund 60 MB groß, weil das ML-Kit-Modell für alle CPU-Architekturen
