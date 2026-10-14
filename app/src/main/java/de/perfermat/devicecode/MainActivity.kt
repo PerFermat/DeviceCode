@@ -41,7 +41,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -63,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -190,13 +192,13 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
                 }
             }
         } else {
-            FilledTonalButton(
+            FilledTonalIconButton(
                 onClick = onOpenSettings,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .safeDrawingPadding()
                     .padding(16.dp),
-            ) { Text("Einstellungen") }
+            ) { Icon(painterResource(R.drawable.ic_settings), contentDescription = "Einstellungen") }
         }
 
         Card(

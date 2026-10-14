@@ -15,7 +15,7 @@ aus Chrome angemeldet und muss den Code nur noch einfügen.
    und bestätigen, dann oben auf die Kamera tippen (oder das Fenster nach unten wischen). Die Kamera
    läuft auch hinter dem Fenster weiter: Erscheint schon der nächste Code, wird das Fenster durch ein
    neues ersetzt. Codes, die schon verarbeitet wurden (die letzten 10), lösen nicht noch einmal aus.
-4. Ist in den **Einstellungen** (Knopf oben rechts) „Code automatisch eintragen“ an (Standard),
+4. Ist in den **Einstellungen** (Zahnrad oben rechts) „Code automatisch eintragen“ an (Standard),
    wird die Seite als `https://www.google.com/device?user_code=…` geöffnet und das Eingabefeld ist
    schon ausgefüllt. Ausgeschaltet bleibt nur die Zwischenablage.
 5. **Erneut öffnen** kopiert den letzten Code noch einmal und öffnet die Seite, falls der Tab
