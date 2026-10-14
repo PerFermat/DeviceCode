@@ -59,3 +59,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 Hinweis: Das Debug-APK ist rund 60 MB groß, weil das ML-Kit-Modell für alle CPU-Architekturen
 mitgeliefert wird. Wer es kleiner möchte, kann in `app/build.gradle.kts` unter `defaultConfig`
 `ndk { abiFilters += "arm64-v8a" }` eintragen. Das reicht für praktisch alle aktuellen Handys.
+
+## Lizenz
+
+MIT – siehe [LICENSE](LICENSE).
