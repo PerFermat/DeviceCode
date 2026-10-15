@@ -47,6 +47,20 @@ class DeviceCodeParserTest {
     }
 
     @Test
+    fun suggestsCodeLikeStrings() {
+        listOf("12345678", "AB12CD", "QXRTZK", "A1B2", "ABCD-1234").forEach {
+            assertEquals(it, true, DeviceCodeParser.isCodeLike(it))
+        }
+    }
+
+    @Test
+    fun doesNotSuggestWords() {
+        listOf("YOUTUBE", "NETFLIX", "ANMELDEN", "1080P", "H264", "2026", "Hallo", "HTTPS", "OK", "4K").forEach {
+            assertEquals(it, false, DeviceCodeParser.isCodeLike(it))
+        }
+    }
+
+    @Test
     fun detectorFiresOnceAfterThreeEqualFrames() {
         val detector = StableCodeDetector()
         val results = listOf("A", "A", null, "A", "A", "A", "A", "B").map { detector.onFrame(it)?.code }

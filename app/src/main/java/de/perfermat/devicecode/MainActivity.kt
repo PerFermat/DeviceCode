@@ -1,6 +1,27 @@
 package de.perfermat.devicecode
 
 import android.Manifest
+import android.graphics.Bitmap
+import android.graphics.Matrix
+import android.graphics.Rect
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.min
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -14,7 +35,6 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.provider.Settings
-import android.util.Size
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -177,17 +197,31 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
         }
     }
 
+    fun accept(code: String, url: String?) {
+        recentCodes = (recentCodes - code + code).takeLast(REMEMBERED_CODES)
+        lastCode = code
+        vibrate(context)
+        openOrChoose(code, url)
+    }
+
+    val scanControl = remember { ScanControl() }
+    // Das angetippte, eingefrorene Bild, in dem der Nutzer den Code selbst markiert.
+    var frozen by remember { mutableStateOf<FrozenFrame?>(null) }
+
+    fun unfreeze() {
+        frozen = null
+        scanControl.paused = false
+    }
+
     Box(Modifier.fillMaxSize()) {
         // Die Kamera läuft auch hinter dem Halbfenster weiter und erkennt so schon den nächsten Code.
         CameraPreview(
+            control = scanControl,
             modifier = Modifier.fillMaxSize(),
-            onDetection = { (code, url) ->
-                if (code !in recentCodes) {
-                    recentCodes = (recentCodes + code).takeLast(REMEMBERED_CODES)
-                    lastCode = code
-                    vibrate(context)
-                    openOrChoose(code, url)
-                }
+            onDetection = { (code, url) -> if (code !in recentCodes) accept(code, url) },
+            onCapture = { frame ->
+                scanControl.paused = true
+                frozen = frame
             },
         )
 
@@ -213,6 +247,12 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
                 }
             }
         } else {
+            // Antippen friert das Bild ein, damit der Nutzer einen Code in anderem Format markieren kann.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clickable { scanControl.captureNext.set(true) }
+            )
             FilledTonalIconButton(
                 onClick = onOpenSettings,
                 modifier = Modifier
@@ -242,6 +282,11 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
                     Text(
                         "Kamera auf den Code am Fernseher richten",
                         style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        "Wird er nicht erkannt: aufs Bild tippen und den Code selbst markieren.",
+                        style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                     )
                 } else {
@@ -277,14 +322,148 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
                 }
             }
         }
+
+        frozen?.let { frame ->
+            FrozenFrameScreen(
+                frame = frame,
+                onUse = { code ->
+                    unfreeze()
+                    accept(code, frame.url)
+                },
+                onCancel = ::unfreeze,
+            )
+        }
     }
 }
 
+/** Steuert die Analyse von außen: ein Bild festhalten oder die Erkennung anhalten. */
+private class ScanControl {
+    val captureNext = AtomicBoolean(false)
+
+    @Volatile
+    var paused = false
+}
+
+/** Ein erkanntes Wort mit seiner Position im (aufrecht gedrehten) Bild. */
+private class Word(val text: String, val box: Rect)
+
+private class FrozenFrame(val bitmap: Bitmap, val words: List<Word>, val url: String?)
+
 @Composable
-private fun CameraPreview(onDetection: (Detection) -> Unit, modifier: Modifier = Modifier) {
+private fun FrozenFrameScreen(frame: FrozenFrame, onUse: (String) -> Unit, onCancel: () -> Unit) {
+    val image = remember(frame) { frame.bitmap.asImageBitmap() }
+    // Vorschlag: das längste Wort, das wie ein Code aussieht.
+    val suggestion = remember(frame) {
+        frame.words.indices.filter { DeviceCodeParser.isCodeLike(frame.words[it].text) }
+            .maxByOrNull { frame.words[it].text.length }
+    }
+    var selected by remember(frame) { mutableStateOf(setOfNotNull(suggestion)) }
+    var text by remember(frame) { mutableStateOf(suggestion?.let { frame.words[it].text }.orEmpty()) }
+    BackHandler(onBack = onCancel)
+
+    val selectedColor = MaterialTheme.colorScheme.primary
+    val suggestedColor = MaterialTheme.colorScheme.tertiary
+    val otherColor = Color.White.copy(alpha = 0.5f)
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .safeDrawingPadding()
+    ) {
+        Text(
+            "Tippe auf den Code – mehrere Teile nacheinander antippen.",
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+        )
+        Canvas(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .pointerInput(frame) {
+                    detectTapGestures { tap ->
+                        val fit = ImageFit(size.width.toFloat(), size.height.toFloat(), image)
+                        val x = (tap.x - fit.dx) / fit.scale
+                        val y = (tap.y - fit.dy) / fit.scale
+                        // Etwas Spielraum, die Rahmen sind auf dem Handy klein.
+                        val slop = 16 / fit.scale
+                        val hit = frame.words.indices.firstOrNull { i ->
+                            val box = frame.words[i].box
+                            x >= box.left - slop && x <= box.right + slop && y >= box.top - slop && y <= box.bottom + slop
+                        } ?: return@detectTapGestures
+                        selected = if (hit in selected) selected - hit else selected + hit
+                        // Wörter in Lesereihenfolge zusammensetzen, wie ML Kit sie geliefert hat.
+                        text = selected.sorted().joinToString(" ") { frame.words[it].text }
+                    }
+                }
+        ) {
+            val fit = ImageFit(size.width, size.height, image)
+            drawImage(
+                image,
+                dstOffset = IntOffset(fit.dx.toInt(), fit.dy.toInt()),
+                dstSize = IntSize((image.width * fit.scale).toInt(), (image.height * fit.scale).toInt()),
+            )
+            frame.words.forEachIndexed { i, word ->
+                val color = when {
+                    i in selected -> selectedColor
+                    DeviceCodeParser.isCodeLike(word.text) -> suggestedColor
+                    else -> otherColor
+                }
+                drawRect(
+                    color,
+                    topLeft = Offset(fit.dx + word.box.left * fit.scale, fit.dy + word.box.top * fit.scale),
+                    size = Size(word.box.width() * fit.scale, word.box.height() * fit.scale),
+                    style = Stroke(width = if (i in selected) 6f else 3f),
+                )
+            }
+        }
+        Card(
+            Modifier
+                .fillMaxWidth()
+                .imePadding()
+                .padding(16.dp)
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Code") },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Monospace),
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onCancel) { Text("Abbrechen") }
+                    val code = text.filterNot { it.isWhitespace() }
+                    Button(onClick = { onUse(code) }, enabled = code.isNotEmpty()) { Text("Übernehmen") }
+                }
+            }
+        }
+    }
+}
+
+/** Skalierung und Versatz, mit denen ein Bild eingepasst (ContentScale.Fit) und zentriert wird. */
+private class ImageFit(width: Float, height: Float, image: ImageBitmap) {
+    val scale = min(width / image.width, height / image.height)
+    val dx = (width - image.width * scale) / 2
+    val dy = (height - image.height * scale) / 2
+}
+
+@Composable
+private fun CameraPreview(
+    control: ScanControl,
+    onDetection: (Detection) -> Unit,
+    onCapture: (FrozenFrame) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentOnDetection by rememberUpdatedState(onDetection)
+    val currentOnCapture by rememberUpdatedState(onCapture)
 
     val view = LocalView.current
     DisposableEffect(view) {
@@ -300,14 +479,19 @@ private fun CameraPreview(onDetection: (Detection) -> Unit, modifier: Modifier =
             imageAnalysisResolutionSelector = ResolutionSelector.Builder()
                 .setResolutionStrategy(
                     ResolutionStrategy(
-                        Size(1280, 720),
+                        android.util.Size(1280, 720),
                         ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
                     )
                 )
                 .build()
             setImageAnalysisAnalyzer(
                 ContextCompat.getMainExecutor(context),
-                CodeAnalyzer(recognizer) { currentOnDetection(it) },
+                CodeAnalyzer(
+                    recognizer,
+                    control,
+                    onDetection = { currentOnDetection(it) },
+                    onCapture = { currentOnCapture(it) },
+                ),
             )
         }
     }
@@ -335,23 +519,42 @@ private fun CameraPreview(onDetection: (Detection) -> Unit, modifier: Modifier =
 
 private class CodeAnalyzer(
     private val recognizer: TextRecognizer,
+    private val control: ScanControl,
     private val onDetection: (Detection) -> Unit,
+    private val onCapture: (FrozenFrame) -> Unit,
 ) : ImageAnalysis.Analyzer {
 
     private val detector = StableCodeDetector(requiredFrames = 3)
 
     override fun analyze(image: ImageProxy) {
+        if (control.paused) return image.close()
         val mediaImage = image.image ?: return image.close()
-        recognizer.process(InputImage.fromMediaImage(mediaImage, image.imageInfo.rotationDegrees))
+        val rotation = image.imageInfo.rotationDegrees
+        // Das Bild muss vor close() kopiert werden; ML Kit liefert die Rahmen fürs aufrechte Bild.
+        val snapshot = if (control.captureNext.getAndSet(false)) image.toBitmap().rotated(rotation) else null
+        recognizer.process(InputImage.fromMediaImage(mediaImage, rotation))
             .addOnSuccessListener { result ->
-                detector.onFrame(DeviceCodeParser.find(result.text), DeviceCodeParser.findUrl(result.text))
-                    ?.let(onDetection)
+                if (snapshot != null) {
+                    val words = result.textBlocks.flatMap { it.lines }.flatMap { it.elements }
+                        .mapNotNull { element -> element.boundingBox?.let { Word(element.text, it) } }
+                    onCapture(FrozenFrame(snapshot, words, DeviceCodeParser.findUrl(result.text)))
+                } else {
+                    detector.onFrame(DeviceCodeParser.find(result.text), DeviceCodeParser.findUrl(result.text))
+                        ?.let(onDetection)
+                }
             }
-            .addOnFailureListener { detector.onFrame(null) }
+            .addOnFailureListener {
+                if (snapshot != null) control.captureNext.set(true) // Mit dem nächsten Bild noch einmal.
+                detector.onFrame(null)
+            }
             // Erst danach kommt das nächste Frame – so läuft nie mehr als eine Erkennung gleichzeitig.
             .addOnCompleteListener { image.close() }
     }
 }
+
+private fun Bitmap.rotated(degrees: Int): Bitmap =
+    if (degrees == 0) this
+    else Bitmap.createBitmap(this, 0, 0, width, height, Matrix().apply { postRotate(degrees.toFloat()) }, true)
 
 @Composable
 private fun PermissionScreen(onRequest: () -> Unit) {

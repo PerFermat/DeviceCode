@@ -34,6 +34,35 @@ object DeviceCodeParser {
             .firstOrNull { groups -> groups.all { group -> group.any { it in 'A'..'Z' } } }
             ?.joinToString("-") { group -> group.map { ocrFixes[it] ?: it }.joinToString("") }
 
+    // Technische Angaben, die wie Codes aussehen: "1080P", "H264", "4K", "60HZ", "32GB" …
+    private val technicalTerms = Regex("\\d{3,4}P|[HX]26[45]|\\d+(?:K|HZ|FPS|KB|MB|GB|TB|MP)")
+    private val nonCodes = setOf("HTTP", "HTTPS", "HDMI", "WLAN", "WIFI", "DVBT", "DVBC")
+    private const val VOWELS = "AEIOUYÄÖÜ"
+
+    /**
+     * Sieht der Text wie ein Code aus und nicht wie ein Wort? Dient nur als Vorschlag beim
+     * Markieren von Hand – für eine automatische Auslösung ist das zu unsicher.
+     */
+    fun isCodeLike(text: String): Boolean {
+        val s = text.filterNot { it == '-' || it.isWhitespace() }
+        if (s.length !in 4..12 || !s.all { it in 'A'..'Z' || it in '0'..'9' }) return false
+        if (s in nonCodes || technicalTerms.matches(s)) return false
+        val hasDigit = s.any { it.isDigit() }
+        val hasLetter = s.any { it.isLetter() }
+        return when {
+            hasDigit && hasLetter -> true
+            hasDigit -> s.length >= 5 // Vierstellige Zahlen sind meist Jahreszahlen oder Uhrzeiten.
+            else -> !looksLikeWord(s)
+        }
+    }
+
+    // Wörter haben genug Vokale und keine langen Konsonantenketten; zufällige Buchstabenfolgen schon.
+    private fun looksLikeWord(s: String): Boolean {
+        val vowelShare = s.count { it in VOWELS }.toDouble() / s.length
+        val longestConsonantRun = s.split(*VOWELS.toCharArray()).maxOf { it.length }
+        return vowelShare >= 0.25 && longestConsonantRun < 4
+    }
+
     /** Liefert die erste Adresse im Text als "https://…" oder null. */
     fun findUrl(text: String): String? =
         urlPattern.findAll(text)

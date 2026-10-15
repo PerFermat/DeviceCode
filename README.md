@@ -8,8 +8,9 @@ Google-Anmeldung.
 DeviceCode liest diesen Code mit der Handykamera ab, kopiert ihn in die Zwischenablage und öffnet
 die passende Seite in einem Chrome Custom Tab. Dort ist man schon mit dem Google-Konto aus Chrome
 angemeldet und muss den Code nur noch bestätigen. Steht auf dem Bildschirm eine andere Adresse,
-öffnet die App diese. Erkannt werden aber nur Codes im Format von Google (drei Gruppen à 3–4
-Zeichen); reine Zahlencodes wie bei Netflix oder Amazon liest die App nicht.
+öffnet die App diese. Automatisch erkannt werden nur Codes im Format von Google (drei Gruppen à 3–4
+Zeichen). Codes in anderen Formaten (z. B. `48271593` oder `AB12CD`) markiert man von Hand, siehe
+unten.
 
 ## Ablauf
 
@@ -30,6 +31,16 @@ Zeichen); reine Zahlencodes wie bei Netflix oder Amazon liest die App nicht.
    eintragen“); dann bleibt nur die Zwischenablage.
 6. **Erneut öffnen** kopiert den letzten Code noch einmal und öffnet die Seite, falls der Tab
    versehentlich geschlossen wurde.
+
+## Andere Code-Formate
+
+1. Aufs Kamerabild tippen: Das Bild bleibt stehen, alle erkannten Wörter sind eingerahmt.
+2. Wörter, die wie ein Code aussehen und nicht wie ein normales Wort, sind farbig hervorgehoben;
+   das wahrscheinlichste ist schon ausgewählt.
+3. Auf den Code tippen. Besteht er aus mehreren Teilen (`4827 1593`), alle nacheinander antippen.
+   Im Textfeld lässt sich der Code noch korrigieren.
+4. **Übernehmen**: Der Code wird wie ein automatisch erkannter behandelt. Die Adresse kommt aus dem
+   Bild, sonst aus den Einstellungen. **Abbrechen** oder die Zurück-Geste führt zur Live-Kamera.
 
 Die Texterkennung (ML Kit, lateinisches Skript) läuft komplett auf dem Gerät. Die App fordert nur
 die Kamera- und Vibrationsberechtigung an, aber keinen Internetzugriff. Die Webseite lädt der Browser.
