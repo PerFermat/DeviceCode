@@ -1,22 +1,25 @@
 # DeviceCode
 
-Viele Geräte ohne richtige Tastatur melden sich über Google an, indem sie einen Code anzeigen
-(z. B. `ABC-DEF-GHI`), den man unter <https://www.google.com/device> eingibt. Das machen etwa
-YouTube auf Smart-TVs und Konsolen, Kodi-Add-ons wie das YouTube-Add-on und andere Apps mit
-Google-Anmeldung.
+Fernseher, Konsolen und Streaming-Sticks lassen sich meist nicht per Tastatur anmelden. Stattdessen
+zeigen sie einen Code und eine Adresse an – „Gehe zu netflix.com/tv8 und gib 48271593 ein“ oder
+„google.com/device, Code ABC-DEF-GHI“. So machen es etwa Netflix, YouTube, Disney+, Prime Video
+oder Kodi-Add-ons.
 
-DeviceCode liest diesen Code mit der Handykamera ab, kopiert ihn in die Zwischenablage und öffnet
-die passende Seite in einem Chrome Custom Tab. Dort ist man schon mit dem Google-Konto aus Chrome
-angemeldet und muss den Code nur noch bestätigen. Steht auf dem Bildschirm eine andere Adresse,
-öffnet die App diese. Automatisch erkannt werden nur Codes im Format von Google (drei Gruppen à 3–4
-Zeichen). Codes in anderen Formaten (z. B. `48271593` oder `AB12CD`) markiert man von Hand, siehe
-unten.
+DeviceCode erspart das Abtippen: Handy auf den Bildschirm richten, die App liest Code und Adresse,
+kopiert den Code in die Zwischenablage und öffnet die Seite im Browser. Dort ist man meist schon
+angemeldet und muss den Code nur noch einfügen und bestätigen.
+
+- **Automatisch** erkennt die App Codes im Format `ABC-DEF-GHI` (Google, YouTube, viele Kodi-Add-ons).
+  Bei `google.com/device` ist der Code sogar schon eingetragen.
+- **Alle anderen Codes** (z. B. `48271593` oder `AB12CD`): einmal aufs Kamerabild tippen und den
+  Code markieren – die App schlägt den wahrscheinlichsten schon vor.
 
 ## Ablauf
 
 1. App starten: Die Kamera läuft sofort.
-2. Handy auf den Fernseher richten. Wird derselbe Code in 3 Frames hintereinander erkannt,
-   vibriert das Handy, der Code wird groß angezeigt und in die Zwischenablage kopiert.
+2. Handy auf den Fernseher richten. Wird ein Code im Format `ABC-DEF-GHI` in 3 Frames hintereinander
+   gleich erkannt, vibriert das Handy, der Code wird groß angezeigt und in die Zwischenablage kopiert.
+   Andere Formate markiert man von Hand (siehe [Andere Code-Formate](#andere-code-formate)).
 3. Welche Seite sich öffnet:
    - Steht im Bild eine Adresse (z. B. `google.com/device`), wird genau diese geöffnet.
    - Sonst die Adresse aus den **Einstellungen** (Zahnrad oben rechts). Ab Werk ist das
