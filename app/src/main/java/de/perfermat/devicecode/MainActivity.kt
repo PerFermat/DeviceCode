@@ -47,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -78,7 +79,6 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
-private const val DEVICE_URL = "https://www.google.com/device"
 private const val CHROME = "com.android.chrome"
 private const val REMEMBERED_CODES = 10
 private const val TAB_HEIGHT_FRACTION = 0.7
@@ -139,6 +139,10 @@ private fun DeviceCodeApp() {
 private fun ScannerScreen(onOpenSettings: () -> Unit) {
     val context = LocalContext.current
     var lastCode by rememberSaveable { mutableStateOf<String?>(null) }
+    // Die zuletzt geöffnete Adresse; null, solange der Nutzer noch keine ausgewählt hat.
+    var lastUrl by rememberSaveable { mutableStateOf<String?>(null) }
+    // Die Adressen aus den Einstellungen, zwischen denen der Nutzer gerade wählen soll.
+    var choices by rememberSaveable { mutableStateOf(emptyList<String>()) }
     // Die zuletzt verarbeiteten Codes – der Fernseher zeigt einen Code oft noch an, wenn man zurückkommt.
     var recentCodes by rememberSaveable { mutableStateOf(emptyList<String>()) }
     // Ein Zähler statt eines Flags: Wird ein Tab durch einen neuen ersetzt, kommt das Ergebnis
@@ -148,11 +152,28 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
         ActivityResultContracts.StartActivityForResult()
     ) { openTabs = (openTabs - 1).coerceAtLeast(0) }
 
-    fun open(code: String) {
+    fun open(code: String, url: String) {
+        lastUrl = url
+        choices = emptyList()
         if (openTabs > 0) returnToCamera(context)
-        copyAndOpen(context, code) { intent ->
+        copyAndOpen(context, code, url) { intent ->
             tabLauncher.launch(intent)
             openTabs++
+        }
+    }
+
+    // Adresse aus dem Bild, sonst die einzige aus den Einstellungen, sonst nachfragen.
+    fun openOrChoose(code: String, detectedUrl: String?) {
+        val urls = AppSettings.urls(context)
+        when {
+            detectedUrl != null -> open(code, detectedUrl)
+            urls.size == 1 -> open(code, urls.single())
+            else -> {
+                lastUrl = null
+                choices = urls
+                copyToClipboard(context, code)
+                if (openTabs > 0) returnToCamera(context)
+            }
         }
     }
 
@@ -160,12 +181,12 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
         // Die Kamera läuft auch hinter dem Halbfenster weiter und erkennt so schon den nächsten Code.
         CameraPreview(
             modifier = Modifier.fillMaxSize(),
-            onCode = { code ->
+            onDetection = { (code, url) ->
                 if (code !in recentCodes) {
                     recentCodes = (recentCodes + code).takeLast(REMEMBERED_CODES)
                     lastCode = code
                     vibrate(context)
-                    open(code)
+                    openOrChoose(code, url)
                 }
             },
         )
@@ -216,6 +237,7 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val code = lastCode
+                val url = lastUrl
                 if (code == null) {
                     Text(
                         "Kamera auf den Code am Fernseher richten",
@@ -230,13 +252,27 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                     )
-                    Text(
-                        "In die Zwischenablage kopiert – auf der Seite einfügen.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                    )
-                    Button(onClick = { open(code) }) {
-                        Text("Erneut öffnen")
+                    if (choices.isNotEmpty()) {
+                        Text(
+                            "Im Bild war keine Adresse zu lesen. Welche Seite soll geöffnet werden?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                        )
+                        choices.forEach { choice ->
+                            OutlinedButton(onClick = { open(code, choice) }, Modifier.fillMaxWidth()) {
+                                Text(displayUrl(choice))
+                            }
+                        }
+                        TextButton(onClick = { choices = emptyList() }) { Text("Abbrechen") }
+                    } else {
+                        Text(
+                            if (url != null) "Kopiert – geöffnet: ${displayUrl(url)}" else "In die Zwischenablage kopiert",
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                        )
+                        Button(onClick = { if (url != null) open(code, url) else openOrChoose(code, null) }) {
+                            Text("Erneut öffnen")
+                        }
                     }
                 }
             }
@@ -245,10 +281,10 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
 }
 
 @Composable
-private fun CameraPreview(onCode: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun CameraPreview(onDetection: (Detection) -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val currentOnCode by rememberUpdatedState(onCode)
+    val currentOnDetection by rememberUpdatedState(onDetection)
 
     val view = LocalView.current
     DisposableEffect(view) {
@@ -271,7 +307,7 @@ private fun CameraPreview(onCode: (String) -> Unit, modifier: Modifier = Modifie
                 .build()
             setImageAnalysisAnalyzer(
                 ContextCompat.getMainExecutor(context),
-                CodeAnalyzer(recognizer) { currentOnCode(it) },
+                CodeAnalyzer(recognizer) { currentOnDetection(it) },
             )
         }
     }
@@ -299,7 +335,7 @@ private fun CameraPreview(onCode: (String) -> Unit, modifier: Modifier = Modifie
 
 private class CodeAnalyzer(
     private val recognizer: TextRecognizer,
-    private val onCode: (String) -> Unit,
+    private val onDetection: (Detection) -> Unit,
 ) : ImageAnalysis.Analyzer {
 
     private val detector = StableCodeDetector(requiredFrames = 3)
@@ -308,7 +344,8 @@ private class CodeAnalyzer(
         val mediaImage = image.image ?: return image.close()
         recognizer.process(InputImage.fromMediaImage(mediaImage, image.imageInfo.rotationDegrees))
             .addOnSuccessListener { result ->
-                detector.onFrame(DeviceCodeParser.find(result.text))?.let(onCode)
+                detector.onFrame(DeviceCodeParser.find(result.text), DeviceCodeParser.findUrl(result.text))
+                    ?.let(onDetection)
             }
             .addOnFailureListener { detector.onFrame(null) }
             // Erst danach kommt das nächste Frame – so läuft nie mehr als eine Erkennung gleichzeitig.
@@ -354,9 +391,13 @@ private fun vibrate(context: Context) {
     vibrator?.vibrate(VibrationEffect.createOneShot(80, VibrationEffect.DEFAULT_AMPLITUDE))
 }
 
-private fun copyAndOpen(context: Context, code: String, launch: (Intent) -> Unit) {
+private fun copyToClipboard(context: Context, code: String) {
     context.getSystemService(ClipboardManager::class.java)
         ?.setPrimaryClip(ClipData.newPlainText("Gerätecode", code))
+}
+
+private fun copyAndOpen(context: Context, code: String, url: String, launch: (Intent) -> Unit) {
+    copyToClipboard(context, code)
 
     // Als Halbfenster (Partial Custom Tab): Oben bleibt die Kamera sichtbar und nimmt Tipps an.
     // Browser ohne Unterstützung dafür zeigen die Seite einfach im Vollbild.
@@ -372,13 +413,23 @@ private fun copyAndOpen(context: Context, code: String, launch: (Intent) -> Unit
     // Chrome bevorzugen, damit die dort bestehende Google-Anmeldung greift; sonst Standardbrowser.
     CustomTabsClient.getPackageName(context, listOf(CHROME), true)
         ?.let { customTab.intent.setPackage(it) }
-    val url = if (AppSettings.prefillCode(context)) "$DEVICE_URL?user_code=${Uri.encode(code)}" else DEVICE_URL
-    customTab.intent.data = Uri.parse(url)
+    customTab.intent.data = Uri.parse(withPrefilledCode(context, url, code))
     try {
         // Chrome zeigt das Halbfenster nur, wenn der Tab per startActivityForResult kommt.
         launch(customTab.intent)
     } catch (_: ActivityNotFoundException) {
         Toast.makeText(context, "Kein Browser gefunden", Toast.LENGTH_LONG).show()
+    }
+}
+
+/** Hängt bei google.com/device den Code an, damit das Eingabefeld schon ausgefüllt ist. */
+private fun withPrefilledCode(context: Context, url: String, code: String): String {
+    val uri = Uri.parse(url)
+    val isGoogleDevicePage = uri.host?.removePrefix("www.") == "google.com" && uri.path?.trimEnd('/') == "/device"
+    return if (isGoogleDevicePage && uri.query == null && AppSettings.prefillCode(context)) {
+        "$url?user_code=${Uri.encode(code)}"
+    } else {
+        url
     }
 }
 

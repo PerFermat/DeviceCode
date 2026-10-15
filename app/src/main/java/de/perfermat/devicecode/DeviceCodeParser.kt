@@ -21,6 +21,11 @@ object DeviceCodeParser {
         '0' to 'O', '1' to 'I', '|' to 'I', '2' to 'Z', '5' to 'S', '6' to 'G', '8' to 'B',
     )
 
+    // Adressen wie "google.com/device", "www.netflix.com/tv8" oder "https://plex.tv/link".
+    private val urlPattern = Regex(
+        "(?i)(?<![\\w.@/])(https?://)?((?:[a-z0-9-]+\\.)+[a-z]{2,})(/[\\w\\-./]*)?"
+    )
+
     /** Liefert den ersten plausiblen Code in normalisierter Form ("ABC-DEF-GHI") oder null. */
     fun find(text: String): String? =
         pattern.findAll(text)
@@ -28,22 +33,36 @@ object DeviceCodeParser {
             // Reine Zahlengruppen ("1080 720 480") sind keine Codes.
             .firstOrNull { groups -> groups.all { group -> group.any { it in 'A'..'Z' } } }
             ?.joinToString("-") { group -> group.map { ocrFixes[it] ?: it }.joinToString("") }
+
+    /** Liefert die erste Adresse im Text als "https://…" oder null. */
+    fun findUrl(text: String): String? =
+        urlPattern.findAll(text)
+            // Ohne Schema muss ein Pfad dabei sein, sonst wäre schon "z.B." oder "Version 1.2" ein Treffer.
+            .firstOrNull { it.groups[1] != null || it.groupValues[3].length > 1 }
+            ?.let { "https://" + it.groupValues[2].lowercase() + it.groupValues[3].trimEnd('.', '/') }
 }
+
+/** Ein stabil erkannter Code und – falls im Bild zu lesen – die Adresse, unter der er einzugeben ist. */
+data class Detection(val code: String, val url: String?)
 
 /** Meldet einen Code erst, wenn er in [requiredFrames] aufeinanderfolgenden Frames gleich war. */
 class StableCodeDetector(private val requiredFrames: Int = 3) {
 
     private var candidate: String? = null
+    private var url: String? = null
     private var count = 0
 
     /** Gibt den Code genau einmal pro ununterbrochener Serie zurück, sonst null. */
-    fun onFrame(code: String?): String? {
+    fun onFrame(code: String?, url: String? = null): Detection? {
         if (code != null && code == candidate) {
             count++
         } else {
             candidate = code
             count = if (code == null) 0 else 1
+            this.url = null
         }
-        return if (count == requiredFrames) code else null
+        // Die Adresse ist kleiner gedruckt und wird nicht in jedem Frame gelesen: die zuletzt gesehene gilt.
+        if (code != null && url != null) this.url = url
+        return if (count == requiredFrames && code != null) Detection(code, this.url) else null
     }
 }

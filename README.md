@@ -6,24 +6,29 @@ YouTube auf Smart-TVs und Konsolen, Kodi-Add-ons wie das YouTube-Add-on und ande
 Google-Anmeldung.
 
 DeviceCode liest diesen Code mit der Handykamera ab, kopiert ihn in die Zwischenablage und öffnet
-die Google-Seite in einem Chrome Custom Tab. Dort ist man schon mit dem Google-Konto aus Chrome
-angemeldet und muss den Code nur noch bestätigen. Codes anderer Anbieter mit eigener
-Anmeldeseite (z. B. Netflix oder Amazon) unterstützt die App nicht.
+die passende Seite in einem Chrome Custom Tab. Dort ist man schon mit dem Google-Konto aus Chrome
+angemeldet und muss den Code nur noch bestätigen. Steht auf dem Bildschirm eine andere Adresse,
+öffnet die App diese. Erkannt werden aber nur Codes im Format von Google (drei Gruppen à 3–4
+Zeichen); reine Zahlencodes wie bei Netflix oder Amazon liest die App nicht.
 
 ## Ablauf
 
 1. App starten: Die Kamera läuft sofort.
 2. Handy auf den Fernseher richten. Wird derselbe Code in 3 Frames hintereinander erkannt,
-   vibriert das Handy, der Code wird groß angezeigt und in die Zwischenablage kopiert,
-   und die Google-Seite öffnet sich.
-3. Mit Chrome öffnet sich die Seite als Halbfenster, oben bleibt die Kamera sichtbar. Code einfügen
-   und bestätigen, dann oben auf die Kamera tippen (oder das Fenster nach unten wischen). Die Kamera
+   vibriert das Handy, der Code wird groß angezeigt und in die Zwischenablage kopiert.
+3. Welche Seite sich öffnet:
+   - Steht im Bild eine Adresse (z. B. `google.com/device`), wird genau diese geöffnet.
+   - Sonst die Adresse aus den **Einstellungen** (Zahnrad oben rechts). Ab Werk ist das
+     `https://www.google.com/device`.
+   - Sind dort mehrere Adressen eingetragen, zeigt die App eine Auswahl.
+4. Mit Chrome öffnet sich die Seite als Halbfenster, oben bleibt die Kamera sichtbar. Code
+   bestätigen, dann oben auf die Kamera tippen (oder das Fenster nach unten wischen). Die Kamera
    läuft auch hinter dem Fenster weiter: Erscheint schon der nächste Code, wird das Fenster durch ein
    neues ersetzt. Codes, die schon verarbeitet wurden (die letzten 10), lösen nicht noch einmal aus.
-4. Ist in den **Einstellungen** (Zahnrad oben rechts) „Code automatisch eintragen“ an (Standard),
-   wird die Seite als `https://www.google.com/device?user_code=…` geöffnet und das Eingabefeld ist
-   schon ausgefüllt. Ausgeschaltet bleibt nur die Zwischenablage.
-5. **Erneut öffnen** kopiert den letzten Code noch einmal und öffnet die Seite, falls der Tab
+5. Bei `google.com/device` hängt die App den Code als `?user_code=…` an, sodass das Eingabefeld
+   schon ausgefüllt ist. Das lässt sich in den Einstellungen abschalten („Code automatisch
+   eintragen“); dann bleibt nur die Zwischenablage.
+6. **Erneut öffnen** kopiert den letzten Code noch einmal und öffnet die Seite, falls der Tab
    versehentlich geschlossen wurde.
 
 Die Texterkennung (ML Kit, lateinisches Skript) läuft komplett auf dem Gerät. Die App fordert nur
@@ -60,9 +65,9 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 | Datei | Inhalt |
 | --- | --- |
-| `app/src/main/java/.../DeviceCodeParser.kt` | Regex samt OCR-Korrekturen (0→O, 1→I, 5→S …) und die Prüfung „3 Frames gleich“ |
+| `app/src/main/java/.../DeviceCodeParser.kt` | Erkennung von Code und Adresse samt OCR-Korrekturen (0→O, 1→I, 5→S …) und die Prüfung „3 Frames gleich“ |
 | `app/src/main/java/.../MainActivity.kt` | Compose-UI, Berechtigung, CameraX + ML Kit, Zwischenablage, Vibration, Custom Tab |
-| `app/src/main/java/.../AppSettings.kt` | Einstellungen (SharedPreferences) und Einstellungsseite |
+| `app/src/main/java/.../AppSettings.kt` | Einstellungen (Adressliste, Code eintragen) und Einstellungsseite |
 | `gradle/libs.versions.toml` | Alle Abhängigkeits-Versionen |
 
 Hinweis: Das Debug-APK ist rund 60 MB groß, weil das ML-Kit-Modell für alle CPU-Architekturen

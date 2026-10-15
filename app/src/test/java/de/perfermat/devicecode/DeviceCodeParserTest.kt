@@ -32,9 +32,33 @@ class DeviceCodeParserTest {
     }
 
     @Test
+    fun findsUrls() {
+        assertEquals("https://google.com/device", DeviceCodeParser.findUrl("Gehe zu google.com/device und gib"))
+        assertEquals("https://www.google.com/device", DeviceCodeParser.findUrl("Gehe zu www.Google.com/device."))
+        assertEquals("https://www.netflix.com/tv8", DeviceCodeParser.findUrl("Besuche www.netflix.com/tv8"))
+        assertEquals("https://plex.tv", DeviceCodeParser.findUrl("öffne https://plex.tv/"))
+    }
+
+    @Test
+    fun ignoresThingsThatAreNoUrls() {
+        assertNull(DeviceCodeParser.findUrl("z.B. Version 1.2 oder google.com"))
+        assertNull(DeviceCodeParser.findUrl("mail an jemand@example.com/x"))
+        assertNull(DeviceCodeParser.findUrl("ABC-DEF-GHI"))
+    }
+
+    @Test
     fun detectorFiresOnceAfterThreeEqualFrames() {
         val detector = StableCodeDetector()
-        val results = listOf("A", "A", null, "A", "A", "A", "A", "B").map(detector::onFrame)
+        val results = listOf("A", "A", null, "A", "A", "A", "A", "B").map { detector.onFrame(it)?.code }
         assertEquals(listOf(null, null, null, null, null, "A", null, null), results)
+    }
+
+    @Test
+    fun detectorKeepsUrlSeenDuringStreak() {
+        val detector = StableCodeDetector()
+        detector.onFrame("A", "https://x.com/old")
+        detector.onFrame("B", null)
+        detector.onFrame("B", "https://y.com/new")
+        assertEquals(Detection("B", "https://y.com/new"), detector.onFrame("B", null))
     }
 }
