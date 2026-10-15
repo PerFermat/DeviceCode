@@ -73,18 +73,39 @@ Zum Bauen:
 - JDK 17 oder neuer
 - Android SDK mit Plattform 37 (`sdk.dir` in `local.properties` oder `ANDROID_HOME` setzen)
 
+## Varianten
+
+| Variante | Läuft auf | Größe (Release) |
+| --- | --- | --- |
+| `arm64` | Handys mit 64-Bit-ARM-Prozessor – praktisch alle der letzten Jahre | ca. 15 MB |
+| `full` | allen Geräten, auch alten 32-Bit-Handys und dem x86-Emulator | ca. 45 MB |
+
+Der Unterschied liegt nur in den mitgelieferten nativen Bibliotheken des ML-Kit-Modells.
+
 ## Bauen
 
 ```bash
-./gradlew assembleDebug
+./gradlew assembleRelease
 ```
 
-Das APK liegt danach unter `app/build/outputs/apk/debug/app-debug.apk`.
+Die APKs liegen danach unter `app/build/outputs/apk/arm64/release/app-arm64-release.apk` und
+`app/build/outputs/apk/full/release/app-full-release.apk`. Debug-Varianten entsprechend mit
+`./gradlew assembleDebug`.
+
+Ohne eigenen Schlüssel wird das Release mit dem Debug-Schlüssel signiert. Für einen eigenen Schlüssel
+eine Datei `key.properties` im Projektordner anlegen (wird nicht eingecheckt):
+
+```properties
+storeFile=release.jks
+storePassword=…
+keyAlias=…
+keyPassword=…
+```
 
 Unit-Tests für die Code-Erkennung:
 
 ```bash
-./gradlew testDebugUnitTest
+./gradlew testArm64DebugUnitTest
 ```
 
 ## Installieren
@@ -92,7 +113,7 @@ Unit-Tests für die Code-Erkennung:
 USB-Debugging am Handy aktivieren, Handy anschließen und dann:
 
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/arm64/release/app-arm64-release.apk
 ```
 
 ## Aufbau
@@ -103,10 +124,6 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 | `app/src/main/java/.../MainActivity.kt` | Compose-UI, Berechtigung, CameraX + ML Kit, Einfrieren und Markieren, Zwischenablage, Vibration, Custom Tab |
 | `app/src/main/java/.../AppSettings.kt` | Einstellungen (Adressliste, Code eintragen) und Einstellungsseite |
 | `gradle/libs.versions.toml` | Alle Abhängigkeits-Versionen |
-
-Hinweis: Das Debug-APK ist rund 60 MB groß, weil das ML-Kit-Modell für alle CPU-Architekturen
-mitgeliefert wird. Wer es kleiner möchte, kann in `app/build.gradle.kts` unter `defaultConfig`
-`ndk { abiFilters += "arm64-v8a" }` eintragen. Das reicht für praktisch alle aktuellen Handys.
 
 ## Lizenz
 
