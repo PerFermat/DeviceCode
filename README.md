@@ -30,7 +30,7 @@ unten.
    schon ausgefüllt ist. Das lässt sich in den Einstellungen abschalten („Code automatisch
    eintragen“); dann bleibt nur die Zwischenablage.
 6. **Erneut öffnen** kopiert den letzten Code noch einmal und öffnet die Seite, falls der Tab
-   versehentlich geschlossen wurde.
+   versehentlich geschlossen wurde. Wurde noch keine Adresse gewählt, erscheint die Auswahl erneut.
 
 ## Andere Code-Formate
 
@@ -42,10 +42,30 @@ unten.
 4. **Übernehmen**: Der Code wird wie ein automatisch erkannter behandelt. Die Adresse kommt aus dem
    Bild, sonst aus den Einstellungen. **Abbrechen** oder die Zurück-Geste führt zur Live-Kamera.
 
-Die Texterkennung (ML Kit, lateinisches Skript) läuft komplett auf dem Gerät. Die App fordert nur
-die Kamera- und Vibrationsberechtigung an, aber keinen Internetzugriff. Die Webseite lädt der Browser.
+Solange das Bild eingefroren ist, ruht die automatische Erkennung. Ein von Hand übernommener Code
+wird auch dann verwendet, wenn er schon einmal verarbeitet wurde.
+
+## Einstellungen
+
+Erreichbar über das Zahnrad oben rechts:
+
+- **Adressen**: Liste der Seiten, die geöffnet werden, wenn im Bild keine Adresse zu lesen ist.
+  `https://` ergänzt die App selbst. Mindestens eine Adresse bleibt immer stehen.
+- **Code automatisch eintragen**: Hängt bei `google.com/device` den Code an die Adresse an
+  (ab Werk an).
+
+## Datenschutz
+
+Die Texterkennung (ML Kit, lateinisches Skript) läuft komplett auf dem Gerät; Bilder verlassen das
+Handy nicht. Die App fordert nur die Kamera- und Vibrationsberechtigung an, aber keinen
+Internetzugriff. Die Webseite lädt der Browser.
 
 ## Voraussetzungen
+
+Zum Benutzen: Android 8.0 oder neuer. Chrome wird empfohlen – nur damit erscheint die Seite als
+Halbfenster und die Google-Anmeldung aus Chrome steht bereit; andere Browser zeigen sie im Vollbild.
+
+Zum Bauen:
 
 - JDK 17 oder neuer
 - Android SDK mit Plattform 37 (`sdk.dir` in `local.properties` oder `ANDROID_HOME` setzen)
@@ -76,8 +96,8 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 | Datei | Inhalt |
 | --- | --- |
-| `app/src/main/java/.../DeviceCodeParser.kt` | Erkennung von Code und Adresse samt OCR-Korrekturen (0→O, 1→I, 5→S …) und die Prüfung „3 Frames gleich“ |
-| `app/src/main/java/.../MainActivity.kt` | Compose-UI, Berechtigung, CameraX + ML Kit, Zwischenablage, Vibration, Custom Tab |
+| `app/src/main/java/.../DeviceCodeParser.kt` | Erkennung von Google-Code und Adresse samt OCR-Korrekturen (0→O, 1→I, 5→S …), Vorschlag „sieht aus wie ein Code“ und die Prüfung „3 Frames gleich“ |
+| `app/src/main/java/.../MainActivity.kt` | Compose-UI, Berechtigung, CameraX + ML Kit, Einfrieren und Markieren, Zwischenablage, Vibration, Custom Tab |
 | `app/src/main/java/.../AppSettings.kt` | Einstellungen (Adressliste, Code eintragen) und Einstellungsseite |
 | `gradle/libs.versions.toml` | Alle Abhängigkeits-Versionen |
 
