@@ -177,11 +177,11 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
         ActivityResultContracts.StartActivityForResult()
     ) { openTabs = (openTabs - 1).coerceAtLeast(0) }
 
-    fun open(code: String, url: String) {
+    fun open(code: String, url: String, prefill: Boolean = true) {
         lastUrl = url
         choices = emptyList()
         if (openTabs > 0) returnToCamera(context)
-        copyAndOpen(context, code, url) { intent ->
+        copyAndOpen(context, code, url, prefill) { intent ->
             tabLauncher.launch(intent)
             openTabs++
         }
@@ -329,6 +329,12 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
                             )
                             Button(onClick = { if (url != null) open(code, url) else openOrChoose(code, null) }) {
                                 Text("Erneut öffnen")
+                            }
+                            // Google lehnt den angehängten Code manchmal ab; ohne ihn klappt das Einfügen.
+                            if (url != null && prefillsCode(context, url)) {
+                                TextButton(onClick = { open(code, url, prefill = false) }) {
+                                    Text("Fehler? Ohne Code öffnen und einfügen")
+                                }
                             }
                         }
                     }
@@ -667,7 +673,7 @@ private fun copyToClipboard(context: Context, code: String) {
         ?.setPrimaryClip(ClipData.newPlainText("Gerätecode", code))
 }
 
-private fun copyAndOpen(context: Context, code: String, url: String, launch: (Intent) -> Unit) {
+private fun copyAndOpen(context: Context, code: String, url: String, prefill: Boolean, launch: (Intent) -> Unit) {
     copyToClipboard(context, code)
 
     // Als Halbfenster (Partial Custom Tab): Oben bleibt die Kamera sichtbar und nimmt Tipps an.
@@ -684,7 +690,7 @@ private fun copyAndOpen(context: Context, code: String, url: String, launch: (In
     // Chrome bevorzugen, damit die dort bestehende Google-Anmeldung greift; sonst Standardbrowser.
     CustomTabsClient.getPackageName(context, listOf(CHROME), true)
         ?.let { customTab.intent.setPackage(it) }
-    customTab.intent.data = Uri.parse(withPrefilledCode(context, url, code))
+    customTab.intent.data = Uri.parse(if (prefill && prefillsCode(context, url)) "$url?user_code=${Uri.encode(code)}" else url)
     try {
         // Chrome zeigt das Halbfenster nur, wenn der Tab per startActivityForResult kommt.
         launch(customTab.intent)
@@ -693,15 +699,11 @@ private fun copyAndOpen(context: Context, code: String, url: String, launch: (In
     }
 }
 
-/** Hängt bei google.com/device den Code an, damit das Eingabefeld schon ausgefüllt ist. */
-private fun withPrefilledCode(context: Context, url: String, code: String): String {
+/** Wird bei dieser Adresse der Code angehängt, damit das Eingabefeld schon ausgefüllt ist? Nur bei google.com/device. */
+private fun prefillsCode(context: Context, url: String): Boolean {
     val uri = Uri.parse(url)
     val isGoogleDevicePage = uri.host?.removePrefix("www.") == "google.com" && uri.path?.trimEnd('/') == "/device"
-    return if (isGoogleDevicePage && uri.query == null && AppSettings.prefillCode(context)) {
-        "$url?user_code=${Uri.encode(code)}"
-    } else {
-        url
-    }
+    return isGoogleDevicePage && uri.query == null && AppSettings.prefillCode(context)
 }
 
 /** Schließt einen offenen Custom Tab: Er liegt im selben Task über MainActivity. */
