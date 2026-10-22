@@ -63,6 +63,33 @@ object DeviceCodeParser {
         return vowelShare >= 0.25 && longestConsonantRun < 4
     }
 
+    /**
+     * Ersetzt eine gelesene Adresse durch eine bekannte, wenn sie bis auf Lesefehler gleich ist
+     * ("google.com/devlce" → "https://www.google.com/device"). Sonst bleibt sie, wie sie ist.
+     */
+    fun snapToKnown(url: String, known: List<String>): String {
+        val key = comparable(url)
+        val closest = known.minByOrNull { editDistance(comparable(it), key) } ?: return url
+        return if (editDistance(comparable(closest), key) <= 2) closest else url
+    }
+
+    private fun comparable(url: String) =
+        url.substringAfter("://").removePrefix("www.").substringBefore('?').trimEnd('/').lowercase()
+
+    private fun editDistance(a: String, b: String): Int {
+        var previous = IntArray(b.length + 1) { it }
+        for (i in a.indices) {
+            val current = IntArray(b.length + 1)
+            current[0] = i + 1
+            for (j in b.indices) {
+                val substitution = previous[j] + if (a[i] == b[j]) 0 else 1
+                current[j + 1] = minOf(substitution, previous[j + 1] + 1, current[j] + 1)
+            }
+            previous = current
+        }
+        return previous[b.length]
+    }
+
     /** Liefert die erste Adresse im Text als "https://…" oder null. */
     fun findUrl(text: String): String? =
         urlPattern.findAll(text)
@@ -78,7 +105,7 @@ data class Detection(val code: String, val url: String?)
 class StableCodeDetector(private val requiredFrames: Int = 3) {
 
     private var candidate: String? = null
-    private var url: String? = null
+    private val urls = mutableListOf<String>()
     private var count = 0
 
     /** Gibt den Code genau einmal pro ununterbrochener Serie zurück, sonst null. */
@@ -88,10 +115,16 @@ class StableCodeDetector(private val requiredFrames: Int = 3) {
         } else {
             candidate = code
             count = if (code == null) 0 else 1
-            this.url = null
+            urls.clear()
         }
-        // Die Adresse ist kleiner gedruckt und wird nicht in jedem Frame gelesen: die zuletzt gesehene gilt.
-        if (code != null && url != null) this.url = url
-        return if (count == requiredFrames && code != null) Detection(code, this.url) else null
+        if (code != null && url != null) urls += url
+        return if (count == requiredFrames && code != null) Detection(code, mostFrequentUrl()) else null
+    }
+
+    // Die Adresse ist kleiner gedruckt und wird nicht in jedem Frame gleich gelesen. Ein einzelner
+    // Lesefehler soll nicht gewinnen: Es gilt die häufigste, bei Gleichstand die zuletzt gelesene.
+    private fun mostFrequentUrl(): String? {
+        val counts = urls.groupingBy { it }.eachCount()
+        return counts.keys.maxWithOrNull(compareBy({ counts.getValue(it) }, { urls.lastIndexOf(it) }))
     }
 }

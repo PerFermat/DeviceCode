@@ -1,6 +1,11 @@
 package de.perfermat.devicecode
 
 import android.Manifest
+import androidx.camera.core.ZoomState
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.material3.Slider
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.lifecycle.Observer
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.graphics.Rect
@@ -186,7 +191,7 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
     fun openOrChoose(code: String, detectedUrl: String?) {
         val urls = AppSettings.urls(context)
         when {
-            detectedUrl != null -> open(code, detectedUrl)
+            detectedUrl != null -> open(code, DeviceCodeParser.snapToKnown(detectedUrl, urls + GOOGLE_DEVICE_URL))
             urls.size == 1 -> open(code, urls.single())
             else -> {
                 lastUrl = null
@@ -247,11 +252,15 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
                 }
             }
         } else {
-            // Antippen friert das Bild ein, damit der Nutzer einen Code in anderem Format markieren kann.
+            // Antippen friert das Bild ein, damit der Nutzer einen Code in anderem Format markieren kann;
+            // zwei Finger zoomen. Die Vorschau selbst bekommt keine Berührungen mehr ab.
             Box(
                 Modifier
                     .fillMaxSize()
-                    .clickable { scanControl.captureNext.set(true) }
+                    .pointerInput(Unit) { detectTapGestures { scanControl.captureNext.set(true) } }
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, _, zoom, _ -> scanControl.zoomTo(scanControl.zoomRatio * zoom) }
+                    }
             )
             FilledTonalIconButton(
                 onClick = onOpenSettings,
@@ -262,65 +271,70 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
             ) { Icon(painterResource(R.drawable.ic_settings), contentDescription = "Einstellungen") }
         }
 
-        Card(
+        Column(
             Modifier
                 .align(Alignment.BottomCenter)
                 .safeDrawingPadding()
                 .padding(16.dp)
-                .fillMaxWidth()
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                val code = lastCode
-                val url = lastUrl
-                if (code == null) {
-                    Text(
-                        "Kamera auf den Code am Fernseher richten",
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = TextAlign.Center,
-                    )
-                    Text(
-                        "Wird er nicht erkannt: aufs Bild tippen und den Code selbst markieren.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                    )
-                } else {
-                    Text("Zuletzt erkannt", style = MaterialTheme.typography.labelLarge)
-                    Text(
-                        code,
-                        style = MaterialTheme.typography.displaySmall,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    if (choices.isNotEmpty()) {
+            if (openTabs == 0 && scanControl.maxZoom > 1f) ZoomBar(scanControl)
+            Card(Modifier.fillMaxWidth()) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val code = lastCode
+                    val url = lastUrl
+                    if (code == null) {
                         Text(
-                            "Im Bild war keine Adresse zu lesen. Welche Seite soll geöffnet werden?",
+                            "Kamera auf den Code am Fernseher richten",
+                            style = MaterialTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center,
+                        )
+                        Text(
+                            "Wird er nicht erkannt: aufs Bild tippen und den Code selbst markieren.",
                             style = MaterialTheme.typography.bodyMedium,
                             textAlign = TextAlign.Center,
                         )
-                        choices.forEach { choice ->
-                            OutlinedButton(onClick = { open(code, choice) }, Modifier.fillMaxWidth()) {
-                                Text(displayUrl(choice))
-                            }
-                        }
-                        TextButton(onClick = { choices = emptyList() }) { Text("Abbrechen") }
                     } else {
+                        Text("Zuletzt erkannt", style = MaterialTheme.typography.labelLarge)
                         Text(
-                            if (url != null) "Kopiert – geöffnet: ${displayUrl(url)}" else "In die Zwischenablage kopiert",
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
+                            code,
+                            style = MaterialTheme.typography.displaySmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
                         )
-                        Button(onClick = { if (url != null) open(code, url) else openOrChoose(code, null) }) {
-                            Text("Erneut öffnen")
+                        if (choices.isNotEmpty()) {
+                            Text(
+                                "Im Bild war keine Adresse zu lesen. Welche Seite soll geöffnet werden?",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                            )
+                            choices.forEach { choice ->
+                                OutlinedButton(onClick = { open(code, choice) }, Modifier.fillMaxWidth()) {
+                                    Text(displayUrl(choice))
+                                }
+                            }
+                            TextButton(onClick = { choices = emptyList() }) { Text("Abbrechen") }
+                        } else {
+                            Text(
+                                if (url != null) "Kopiert – geöffnet: ${displayUrl(url)}" else "In die Zwischenablage kopiert",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                            )
+                            Button(onClick = { if (url != null) open(code, url) else openOrChoose(code, null) }) {
+                                Text("Erneut öffnen")
+                            }
                         }
                     }
                 }
             }
+
         }
 
         frozen?.let { frame ->
@@ -336,12 +350,59 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
     }
 }
 
-/** Steuert die Analyse von außen: ein Bild festhalten oder die Erkennung anhalten. */
+/** Steuert Kamera und Analyse von außen: Bild festhalten, Erkennung anhalten, zoomen. */
 private class ScanControl {
     val captureNext = AtomicBoolean(false)
 
     @Volatile
     var paused = false
+
+    var camera: CameraController? = null
+    var zoomRatio by mutableFloatStateOf(1f)
+    var maxZoom by mutableFloatStateOf(1f)
+
+    // Der gewünschte Zoom überdauert das Schließen der Kamera, wenn der Custom Tab geöffnet wird.
+    var wantedZoom = 1f
+        private set
+
+    fun zoomTo(ratio: Float) {
+        wantedZoom = ratio.coerceIn(1f, maxZoom.coerceAtLeast(1f))
+        camera?.setZoomRatio(wantedZoom)
+    }
+
+    fun onZoomState(state: ZoomState) {
+        maxZoom = state.maxZoomRatio
+        zoomRatio = state.zoomRatio
+        // Nach dem Zurückkommen startet die Kamera wieder ohne Zoom – den alten wiederherstellen.
+        if (state.zoomRatio == 1f && wantedZoom > 1f) camera?.setZoomRatio(wantedZoom)
+    }
+}
+
+@Composable
+private fun ZoomBar(control: ScanControl) {
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.85f),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Zoom", style = MaterialTheme.typography.labelLarge)
+            Slider(
+                value = control.zoomRatio.coerceIn(1f, control.maxZoom),
+                onValueChange = control::zoomTo,
+                valueRange = 1f..control.maxZoom,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "%.1f×".format(control.zoomRatio),
+                style = MaterialTheme.typography.labelLarge,
+                fontFamily = FontFamily.Monospace,
+            )
+        }
+    }
 }
 
 /** Ein erkanntes Wort mit seiner Position im (aufrecht gedrehten) Bild. */
@@ -500,7 +561,12 @@ private fun CameraPreview(
     // beim Zurückkommen läuft sie automatisch wieder.
     DisposableEffect(lifecycleOwner) {
         controller.bindToLifecycle(lifecycleOwner)
+        control.camera = controller
+        val zoomObserver = Observer<ZoomState>(control::onZoomState)
+        controller.zoomState.observe(lifecycleOwner, zoomObserver)
         onDispose {
+            controller.zoomState.removeObserver(zoomObserver)
+            control.camera = null
             controller.unbind()
             recognizer.close()
         }
@@ -511,6 +577,8 @@ private fun CameraPreview(
         factory = { ctx ->
             PreviewView(ctx).apply {
                 scaleType = PreviewView.ScaleType.FILL_CENTER
+                // Zoomen übernimmt die Compose-Ebene darüber, die auch das Antippen auswertet.
+                controller.isPinchToZoomEnabled = false
                 this.controller = controller
             }
         },

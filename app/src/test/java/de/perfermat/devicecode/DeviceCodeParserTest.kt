@@ -68,6 +68,23 @@ class DeviceCodeParserTest {
     }
 
     @Test
+    fun snapsMisreadUrlsToKnownOnes() {
+        val known = listOf("https://www.google.com/device", "https://netflix.com/tv8")
+        assertEquals("https://www.google.com/device", DeviceCodeParser.snapToKnown("https://google.com/devlce", known))
+        assertEquals("https://www.google.com/device", DeviceCodeParser.snapToKnown("https://gooqle.com/device", known))
+        assertEquals("https://netflix.com/tv8", DeviceCodeParser.snapToKnown("https://www.netflix.com/tvB", known))
+        assertEquals("https://plex.tv/link", DeviceCodeParser.snapToKnown("https://plex.tv/link", known))
+    }
+
+    @Test
+    fun detectorPrefersMostFrequentUrl() {
+        val detector = StableCodeDetector()
+        detector.onFrame("B", "https://google.com/device")
+        detector.onFrame("B", "https://google.com/devlce")
+        assertEquals(Detection("B", "https://google.com/device"), detector.onFrame("B", "https://google.com/device"))
+    }
+
+    @Test
     fun detectorKeepsUrlSeenDuringStreak() {
         val detector = StableCodeDetector()
         detector.onFrame("A", "https://x.com/old")

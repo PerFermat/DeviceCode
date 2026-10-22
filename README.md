@@ -16,12 +16,16 @@ angemeldet und muss den Code nur noch einfügen und bestätigen.
 
 ## Ablauf
 
-1. App starten: Die Kamera läuft sofort.
+1. App starten: Die Kamera läuft sofort. Aus größerer Entfernung mit zwei Fingern oder dem
+   Zoom-Regler heranzoomen; der Zoom bleibt erhalten, wenn man aus dem Browser zurückkommt.
 2. Handy auf den Fernseher richten. Wird ein Code im Format `ABC-DEF-GHI` in 3 Frames hintereinander
    gleich erkannt, vibriert das Handy, der Code wird groß angezeigt und in die Zwischenablage kopiert.
    Andere Formate markiert man von Hand (siehe [Andere Code-Formate](#andere-code-formate)).
 3. Welche Seite sich öffnet:
-   - Steht im Bild eine Adresse (z. B. `google.com/device`), wird genau diese geöffnet.
+   - Steht im Bild eine Adresse (z. B. `google.com/device`), wird sie geöffnet. Liest die Kamera sie
+     über mehrere Bilder unterschiedlich, gilt die häufigste Lesart; ist sie bis auf ein, zwei Zeichen
+     gleich einer Adresse aus den Einstellungen, wird diese genommen (`google.com/devlce` →
+     `google.com/device`).
    - Sonst die Adresse aus den **Einstellungen** (Zahnrad oben rechts). Ab Werk ist das
      `https://www.google.com/device`.
    - Sind dort mehrere Adressen eingetragen, zeigt die App eine Auswahl.
