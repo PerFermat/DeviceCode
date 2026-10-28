@@ -51,7 +51,7 @@ object AppSettings {
         prefs(context).edit().putBoolean(PREFILL_CODE, enabled).apply()
     }
 
-    /** Adressen, die geöffnet werden, wenn im Bild keine zu lesen ist. Nie leer. */
+    /** Adressen, unter denen der Code eingegeben wird. Nie leer. */
     fun urls(context: Context): List<String> =
         prefs(context).getString(URLS, null)?.lines()?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }
             ?: listOf(GOOGLE_DEVICE_URL)
@@ -107,8 +107,8 @@ fun SettingsScreen(onBack: () -> Unit) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Adressen", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Steht im Bild eine Adresse, wird sie geöffnet. Sonst öffnet die App die Adresse von " +
-                    "hier – bei mehreren fragt sie nach.",
+                "Diese Seite öffnet die App nach dem Erkennen. Sind mehrere eingetragen, fragt sie " +
+                    "jedes Mal, welche.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             urls.forEach { url ->

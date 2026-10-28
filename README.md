@@ -5,8 +5,9 @@ zeigen sie einen Code und eine Adresse an – „Gehe zu netflix.com/tv8 und gib
 „google.com/device, Code ABC-DEF-GHI“. So machen es etwa Netflix, YouTube, Disney+, Prime Video
 oder Kodi-Add-ons.
 
-DeviceCode erspart das Abtippen: Handy auf den Bildschirm richten, die App liest Code und Adresse,
-kopiert den Code in die Zwischenablage und öffnet die Seite im Browser. Dort ist man meist schon
+DeviceCode erspart das Abtippen: Handy auf den Bildschirm richten, die App liest den Code, kopiert
+ihn in die Zwischenablage und öffnet die passende Seite im Browser. Die Seiten trägt man einmal in
+den Einstellungen ein. Dort ist man meist schon
 angemeldet und muss den Code nur noch einfügen und bestätigen.
 
 - **Automatisch** erkennt die App Codes im Format `ABC-DEF-GHI` (Google, YouTube, viele Kodi-Add-ons).
@@ -21,14 +22,9 @@ angemeldet und muss den Code nur noch einfügen und bestätigen.
 2. Handy auf den Fernseher richten. Wird ein Code im Format `ABC-DEF-GHI` in 3 Frames hintereinander
    gleich erkannt, vibriert das Handy, der Code wird groß angezeigt und in die Zwischenablage kopiert.
    Andere Formate markiert man von Hand (siehe [Andere Code-Formate](#andere-code-formate)).
-3. Welche Seite sich öffnet:
-   - Steht im Bild eine Adresse (z. B. `google.com/device`), wird sie geöffnet. Liest die Kamera sie
-     über mehrere Bilder unterschiedlich, gilt die häufigste Lesart; ist sie bis auf ein, zwei Zeichen
-     gleich einer Adresse aus den Einstellungen, wird diese genommen (`google.com/devlce` →
-     `google.com/device`).
-   - Sonst die Adresse aus den **Einstellungen** (Zahnrad oben rechts). Ab Werk ist das
-     `https://www.google.com/device`.
-   - Sind dort mehrere Adressen eingetragen, zeigt die App eine Auswahl.
+3. Welche Seite sich öffnet, steht in den **Einstellungen** (Zahnrad oben rechts). Ab Werk ist das
+   `https://www.google.com/device`. Sind dort mehrere Adressen eingetragen, fragt die App jedes Mal,
+   welche geöffnet werden soll.
 4. Mit Chrome öffnet sich die Seite als Halbfenster, oben bleibt die Kamera sichtbar. Code
    bestätigen, dann oben auf die Kamera tippen (oder das Fenster nach unten wischen). Die Kamera
    läuft auch hinter dem Fenster weiter: Erscheint schon der nächste Code, wird das Fenster durch ein
@@ -38,6 +34,8 @@ angemeldet und muss den Code nur noch einfügen und bestätigen.
    eintragen“); dann bleibt nur die Zwischenablage.
 6. **Erneut öffnen** kopiert den letzten Code noch einmal und öffnet die Seite, falls der Tab
    versehentlich geschlossen wurde. Wurde noch keine Adresse gewählt, erscheint die Auswahl erneut.
+   Das **✕** neben „Zuletzt erkannt“ blendet den Code wieder aus. Derselbe Code löst danach trotzdem
+   nicht noch einmal aus.
 
 ## Andere Code-Formate
 
@@ -46,8 +44,7 @@ angemeldet und muss den Code nur noch einfügen und bestätigen.
    das wahrscheinlichste ist schon ausgewählt.
 3. Auf den Code tippen. Besteht er aus mehreren Teilen (`4827 1593`), alle nacheinander antippen.
    Im Textfeld lässt sich der Code noch korrigieren.
-4. **Übernehmen**: Der Code wird wie ein automatisch erkannter behandelt. Die Adresse kommt aus dem
-   Bild, sonst aus den Einstellungen. **Abbrechen** oder die Zurück-Geste führt zur Live-Kamera.
+4. **Übernehmen**: Der Code wird wie ein automatisch erkannter behandelt. **Abbrechen** oder die Zurück-Geste führt zur Live-Kamera.
 
 Solange das Bild eingefroren ist, ruht die automatische Erkennung. Ein von Hand übernommener Code
 wird auch dann verwendet, wenn er schon einmal verarbeitet wurde.
@@ -56,8 +53,9 @@ wird auch dann verwendet, wenn er schon einmal verarbeitet wurde.
 
 Erreichbar über das Zahnrad oben rechts:
 
-- **Adressen**: Liste der Seiten, die geöffnet werden, wenn im Bild keine Adresse zu lesen ist.
-  `https://` ergänzt die App selbst. Mindestens eine Adresse bleibt immer stehen.
+- **Adressen**: Liste der Seiten, unter denen der Code eingegeben wird. Bei einer öffnet die App sie
+  direkt, bei mehreren fragt sie nach. `https://` ergänzt die App selbst. Mindestens eine Adresse
+  bleibt immer stehen.
 - **Code automatisch eintragen**: Hängt bei `google.com/device` den Code an die Adresse an
   (ab Werk an).
 
@@ -124,7 +122,7 @@ adb install -r app/build/outputs/apk/arm64/release/app-arm64-release.apk
 
 | Datei | Inhalt |
 | --- | --- |
-| `app/src/main/java/.../DeviceCodeParser.kt` | Erkennung von Google-Code und Adresse samt OCR-Korrekturen (0→O, 1→I, 5→S …), Vorschlag „sieht aus wie ein Code“ und die Prüfung „3 Frames gleich“ |
+| `app/src/main/java/.../DeviceCodeParser.kt` | Erkennung von Google-Codes samt OCR-Korrekturen (0→O, 1→I, 5→S …), Vorschlag „sieht aus wie ein Code“ und die Prüfung „3 Frames gleich“ |
 | `app/src/main/java/.../MainActivity.kt` | Compose-UI, Berechtigung, CameraX + ML Kit, Einfrieren und Markieren, Zwischenablage, Vibration, Custom Tab |
 | `app/src/main/java/.../AppSettings.kt` | Einstellungen (Adressliste, Code eintragen) und Einstellungsseite |
 | `gradle/libs.versions.toml` | Alle Abhängigkeits-Versionen |

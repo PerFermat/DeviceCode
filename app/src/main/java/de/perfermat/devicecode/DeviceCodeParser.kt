@@ -21,11 +21,6 @@ object DeviceCodeParser {
         '0' to 'O', '1' to 'I', '|' to 'I', '2' to 'Z', '5' to 'S', '6' to 'G', '8' to 'B',
     )
 
-    // Adressen wie "google.com/device", "www.netflix.com/tv8" oder "https://plex.tv/link".
-    private val urlPattern = Regex(
-        "(?i)(?<![\\w.@/])(https?://)?((?:[a-z0-9-]+\\.)+[a-z]{2,})(/[\\w\\-./]*)?"
-    )
-
     /** Liefert den ersten plausiblen Code in normalisierter Form ("ABC-DEF-GHI") oder null. */
     fun find(text: String): String? =
         pattern.findAll(text)
@@ -62,69 +57,22 @@ object DeviceCodeParser {
         val longestConsonantRun = s.split(*VOWELS.toCharArray()).maxOf { it.length }
         return vowelShare >= 0.25 && longestConsonantRun < 4
     }
-
-    /**
-     * Ersetzt eine gelesene Adresse durch eine bekannte, wenn sie bis auf Lesefehler gleich ist
-     * ("google.com/devlce" → "https://www.google.com/device"). Sonst bleibt sie, wie sie ist.
-     */
-    fun snapToKnown(url: String, known: List<String>): String {
-        val key = comparable(url)
-        val closest = known.minByOrNull { editDistance(comparable(it), key) } ?: return url
-        return if (editDistance(comparable(closest), key) <= 2) closest else url
-    }
-
-    private fun comparable(url: String) =
-        url.substringAfter("://").removePrefix("www.").substringBefore('?').trimEnd('/').lowercase()
-
-    private fun editDistance(a: String, b: String): Int {
-        var previous = IntArray(b.length + 1) { it }
-        for (i in a.indices) {
-            val current = IntArray(b.length + 1)
-            current[0] = i + 1
-            for (j in b.indices) {
-                val substitution = previous[j] + if (a[i] == b[j]) 0 else 1
-                current[j + 1] = minOf(substitution, previous[j + 1] + 1, current[j] + 1)
-            }
-            previous = current
-        }
-        return previous[b.length]
-    }
-
-    /** Liefert die erste Adresse im Text als "https://…" oder null. */
-    fun findUrl(text: String): String? =
-        urlPattern.findAll(text)
-            // Ohne Schema muss ein Pfad dabei sein, sonst wäre schon "z.B." oder "Version 1.2" ein Treffer.
-            .firstOrNull { it.groups[1] != null || it.groupValues[3].length > 1 }
-            ?.let { "https://" + it.groupValues[2].lowercase() + it.groupValues[3].trimEnd('.', '/') }
 }
-
-/** Ein stabil erkannter Code und – falls im Bild zu lesen – die Adresse, unter der er einzugeben ist. */
-data class Detection(val code: String, val url: String?)
 
 /** Meldet einen Code erst, wenn er in [requiredFrames] aufeinanderfolgenden Frames gleich war. */
 class StableCodeDetector(private val requiredFrames: Int = 3) {
 
     private var candidate: String? = null
-    private val urls = mutableListOf<String>()
     private var count = 0
 
     /** Gibt den Code genau einmal pro ununterbrochener Serie zurück, sonst null. */
-    fun onFrame(code: String?, url: String? = null): Detection? {
+    fun onFrame(code: String?): String? {
         if (code != null && code == candidate) {
             count++
         } else {
             candidate = code
             count = if (code == null) 0 else 1
-            urls.clear()
         }
-        if (code != null && url != null) urls += url
-        return if (count == requiredFrames && code != null) Detection(code, mostFrequentUrl()) else null
-    }
-
-    // Die Adresse ist kleiner gedruckt und wird nicht in jedem Frame gleich gelesen. Ein einzelner
-    // Lesefehler soll nicht gewinnen: Es gilt die häufigste, bei Gleichstand die zuletzt gelesene.
-    private fun mostFrequentUrl(): String? {
-        val counts = urls.groupingBy { it }.eachCount()
-        return counts.keys.maxWithOrNull(compareBy({ counts.getValue(it) }, { urls.lastIndexOf(it) }))
+        return if (count == requiredFrames) code else null
     }
 }

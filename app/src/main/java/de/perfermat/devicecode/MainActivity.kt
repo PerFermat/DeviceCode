@@ -68,6 +68,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -188,10 +189,10 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
     }
 
     // Adresse aus dem Bild, sonst die einzige aus den Einstellungen, sonst nachfragen.
-    fun openOrChoose(code: String, detectedUrl: String?) {
+    // Nur eine Adresse in den Einstellungen: direkt öffnen, sonst immer nachfragen.
+    fun openOrChoose(code: String) {
         val urls = AppSettings.urls(context)
         when {
-            detectedUrl != null -> open(code, DeviceCodeParser.snapToKnown(detectedUrl, urls + GOOGLE_DEVICE_URL))
             urls.size == 1 -> open(code, urls.single())
             else -> {
                 lastUrl = null
@@ -202,11 +203,11 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
         }
     }
 
-    fun accept(code: String, url: String?) {
+    fun accept(code: String) {
         recentCodes = (recentCodes - code + code).takeLast(REMEMBERED_CODES)
         lastCode = code
         vibrate(context)
-        openOrChoose(code, url)
+        openOrChoose(code)
     }
 
     val scanControl = remember { ScanControl() }
@@ -223,7 +224,7 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
         CameraPreview(
             control = scanControl,
             modifier = Modifier.fillMaxSize(),
-            onDetection = { (code, url) -> if (code !in recentCodes) accept(code, url) },
+            onCode = { code -> if (code !in recentCodes) accept(code) },
             onCapture = { frame ->
                 scanControl.paused = true
                 frozen = frame
@@ -302,7 +303,21 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
                             textAlign = TextAlign.Center,
                         )
                     } else {
-                        Text("Zuletzt erkannt", style = MaterialTheme.typography.labelLarge)
+                        Box(Modifier.fillMaxWidth()) {
+                            Text(
+                                "Zuletzt erkannt",
+                                Modifier.align(Alignment.Center),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                            IconButton(
+                                onClick = {
+                                    lastCode = null
+                                    lastUrl = null
+                                    choices = emptyList()
+                                },
+                                modifier = Modifier.align(Alignment.CenterEnd),
+                            ) { Icon(painterResource(R.drawable.ic_close), contentDescription = "Schließen") }
+                        }
                         Text(
                             code,
                             style = MaterialTheme.typography.displaySmall,
@@ -311,7 +326,7 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
                         )
                         if (choices.isNotEmpty()) {
                             Text(
-                                "Im Bild war keine Adresse zu lesen. Welche Seite soll geöffnet werden?",
+                                "Welche Seite soll geöffnet werden?",
                                 style = MaterialTheme.typography.bodyMedium,
                                 textAlign = TextAlign.Center,
                             )
@@ -327,7 +342,7 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
                                 style = MaterialTheme.typography.bodyMedium,
                                 textAlign = TextAlign.Center,
                             )
-                            Button(onClick = { if (url != null) open(code, url) else openOrChoose(code, null) }) {
+                            Button(onClick = { if (url != null) open(code, url) else openOrChoose(code) }) {
                                 Text("Erneut öffnen")
                             }
                             // Google lehnt den angehängten Code manchmal ab; ohne ihn klappt das Einfügen.
@@ -348,7 +363,7 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
                 frame = frame,
                 onUse = { code ->
                     unfreeze()
-                    accept(code, frame.url)
+                    accept(code)
                 },
                 onCancel = ::unfreeze,
             )
@@ -414,7 +429,7 @@ private fun ZoomBar(control: ScanControl) {
 /** Ein erkanntes Wort mit seiner Position im (aufrecht gedrehten) Bild. */
 private class Word(val text: String, val box: Rect)
 
-private class FrozenFrame(val bitmap: Bitmap, val words: List<Word>, val url: String?)
+private class FrozenFrame(val bitmap: Bitmap, val words: List<Word>)
 
 @Composable
 private fun FrozenFrameScreen(frame: FrozenFrame, onUse: (String) -> Unit, onCancel: () -> Unit) {
@@ -523,13 +538,13 @@ private class ImageFit(width: Float, height: Float, image: ImageBitmap) {
 @Composable
 private fun CameraPreview(
     control: ScanControl,
-    onDetection: (Detection) -> Unit,
+    onCode: (String) -> Unit,
     onCapture: (FrozenFrame) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val currentOnDetection by rememberUpdatedState(onDetection)
+    val currentOnCode by rememberUpdatedState(onCode)
     val currentOnCapture by rememberUpdatedState(onCapture)
 
     val view = LocalView.current
@@ -556,7 +571,7 @@ private fun CameraPreview(
                 CodeAnalyzer(
                     recognizer,
                     control,
-                    onDetection = { currentOnDetection(it) },
+                    onCode = { currentOnCode(it) },
                     onCapture = { currentOnCapture(it) },
                 ),
             )
@@ -594,7 +609,7 @@ private fun CameraPreview(
 private class CodeAnalyzer(
     private val recognizer: TextRecognizer,
     private val control: ScanControl,
-    private val onDetection: (Detection) -> Unit,
+    private val onCode: (String) -> Unit,
     private val onCapture: (FrozenFrame) -> Unit,
 ) : ImageAnalysis.Analyzer {
 
@@ -611,10 +626,9 @@ private class CodeAnalyzer(
                 if (snapshot != null) {
                     val words = result.textBlocks.flatMap { it.lines }.flatMap { it.elements }
                         .mapNotNull { element -> element.boundingBox?.let { Word(element.text, it) } }
-                    onCapture(FrozenFrame(snapshot, words, DeviceCodeParser.findUrl(result.text)))
+                    onCapture(FrozenFrame(snapshot, words))
                 } else {
-                    detector.onFrame(DeviceCodeParser.find(result.text), DeviceCodeParser.findUrl(result.text))
-                        ?.let(onDetection)
+                    detector.onFrame(DeviceCodeParser.find(result.text))?.let(onCode)
                 }
             }
             .addOnFailureListener {
