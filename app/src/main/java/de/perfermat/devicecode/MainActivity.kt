@@ -84,6 +84,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -210,7 +211,8 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
         openOrChoose(code)
     }
 
-    val scanControl = remember { ScanControl() }
+    // Gespeichert wird nur der gewünschte Zoom – er soll auch das Drehen des Handys überstehen.
+    val scanControl = rememberSaveable(saver = Saver({ it.wantedZoom }, ::ScanControl)) { ScanControl() }
     // Das angetippte, eingefrorene Bild, in dem der Nutzer den Code selbst markiert.
     var frozen by remember { mutableStateOf<FrozenFrame?>(null) }
 
@@ -372,7 +374,7 @@ private fun ScannerScreen(onOpenSettings: () -> Unit) {
 }
 
 /** Steuert Kamera und Analyse von außen: Bild festhalten, Erkennung anhalten, zoomen. */
-private class ScanControl {
+private class ScanControl(initialZoom: Float = 1f) {
     val captureNext = AtomicBoolean(false)
 
     @Volatile
@@ -382,8 +384,8 @@ private class ScanControl {
     var zoomRatio by mutableFloatStateOf(1f)
     var maxZoom by mutableFloatStateOf(1f)
 
-    // Der gewünschte Zoom überdauert das Schließen der Kamera, wenn der Custom Tab geöffnet wird.
-    var wantedZoom = 1f
+    // Der gewünschte Zoom überdauert das Schließen der Kamera (Custom Tab, Drehen des Handys).
+    var wantedZoom = initialZoom
         private set
 
     fun zoomTo(ratio: Float) {
